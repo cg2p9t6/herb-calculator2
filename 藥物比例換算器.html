@@ -1,0 +1,2309 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>藥物比例換算器</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang TC", "Noto Sans TC", sans-serif;
+    background: #f5f0eb;
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 28px 16px;
+  }
+  .card {
+    background: white;
+    border-radius: 16px;
+    padding: 32px;
+    width: 100%;
+    max-width: 580px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  }
+  h1 { font-size: 1.4rem; color: #3a2e1e; margin-bottom: 5px; }
+  .subtitle { font-size: 0.84rem; color: #aaa; margin-bottom: 24px; }
+
+  /* ── 輸入區 ── */
+  label { display: block; font-size: 0.88rem; color: #555; margin-bottom: 6px; }
+  textarea {
+    width: 100%;
+    border: 1.5px solid #ddd;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 1rem;
+    font-family: "SF Mono", "Menlo", monospace;
+    resize: vertical;
+    min-height: 64px;
+    color: #333;
+    transition: border-color 0.2s;
+    letter-spacing: 0.02em;
+  }
+  textarea:focus { outline: none; border-color: #8b6f47; }
+  textarea.err   { border-color: #e74c3c !important; }
+
+  .count-bar {
+    font-size: 0.78rem;
+    color: #bbb;
+    margin-top: 4px;
+    min-height: 1.15em;
+    transition: color 0.2s;
+  }
+  .count-bar.over { color: #e74c3c; font-weight: 600; }
+
+  .hint { font-size: 0.78rem; color: #bbb; margin-top: 4px; }
+
+  .total-row {
+    display: flex; align-items: center; gap: 10px;
+    margin: 12px 0 18px;
+  }
+  .total-row label { margin: 0; white-space: nowrap; }
+  .total-row input {
+    width: 78px;
+    border: 1.5px solid #ddd;
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 1rem;
+    font-family: inherit;
+    color: #333;
+  }
+  .total-row input:focus { outline: none; border-color: #8b6f47; }
+  .total-row span { font-size: 0.87rem; color: #aaa; }
+
+  /* ── 按鈕 ── */
+  .btn {
+    width: 100%;
+    padding: 13px;
+    background: #8b6f47;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.97rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .btn:hover { background: #7a5f38; }
+
+  /* ── 錯誤 ── */
+  .error {
+    margin-top: 10px;
+    padding: 9px 13px;
+    background: #fff0f0;
+    border: 1px solid #ffcccc;
+    border-radius: 8px;
+    color: #c0392b;
+    font-size: 0.85rem;
+    display: none;
+  }
+
+  /* ── 結果 ── */
+  .results { margin-top: 24px; display: none; }
+
+  .block {
+    margin-bottom: 6px;
+  }
+  .block-divider {
+    border: none;
+    border-top: 1.5px dashed #e8dfd2;
+    margin: 18px 0;
+  }
+
+  /* 區塊標頭 */
+  .block-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .block-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 3px 11px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+  .badge-ref { background: #f0ece4; color: #7a6040; }
+  .badge-a   { background: #f3ede4; color: #8b6f47; }
+  .badge-b   { background: #e4f0ee; color: #3a6a5f; }
+  .badge-x2  { background: #3a6a5f; color: white; }
+  .block-meta { font-size: 0.8rem; color: #bbb; }
+
+  /* 數字 chips */
+  .num-row { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 5px; }
+  .chip {
+    border-radius: 8px;
+    padding: 6px 13px 8px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    font-family: "SF Mono", "Menlo", monospace;
+    min-width: 50px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+  }
+  .chip-name {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: rgba(0, 0, 0, 0.45);
+    letter-spacing: 0.01em;
+    line-height: 1.15;
+    text-align: center;
+    white-space: normal;
+    word-break: break-word;
+    min-height: 1.4em;
+  }
+  .chip u { font-size: 0.67rem; font-weight: 400; color: #bbb; text-decoration: none; margin-left: 1px; }
+  .chip-ratio {
+    font-size: 0.6rem;
+    font-weight: 500;
+    opacity: 0.5;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    font-family: "SF Mono", "Menlo", monospace;
+  }
+  .chip-ref { color: #7a6040; background: #faf7f3; border: 1.5px solid #e0d4c0; }
+  .chip-a   { color: #8b6f47; background: #fdf9f4; border: 1.5px solid #e0ceba; }
+  .chip-b   { color: #3a6a5f; background: #f3faf8; border: 1.5px solid #b8d9d2; }
+  .chip-x2  { color: #1a4a40; background: #e8f5f2; border: 1.5px solid #98bfb8; }
+
+  /* 全方區：A/B chips 分行 */
+  .ref-section { margin-bottom: 4px; }
+  .ref-row-label {
+    font-size: 0.72rem;
+    color: #ccc;
+    margin-bottom: 5px;
+    letter-spacing: 0.04em;
+  }
+
+  .row-sub-label {
+    font-size: 0.75rem;
+    color: #aaa;
+    margin: 11px 0 5px;
+    letter-spacing: 0.04em;
+  }
+  .sum-line { font-size: 0.8rem; color: #aaa; margin-top: 4px; }
+  .sum-line b { color: #555; font-weight: 600; }
+
+  /* 複製按鈕 */
+  .copy-btn {
+    padding: 4px 12px;
+    font-size: 0.78rem;
+    font-family: inherit;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .copy-ref { background: #f0ece4; color: #7a6040; }
+  .copy-ref:hover { background: #e4ddd2; }
+  .copy-a   { background: #f3ede4; color: #8b6f47; }
+  .copy-a:hover   { background: #eae0d4; }
+  .copy-b   { background: #e4f0ee; color: #3a6a5f; }
+  .copy-b:hover   { background: #d4e8e2; }
+  .copy-x2  { background: #3a6a5f; color: white; }
+  .copy-x2:hover  { background: #2e5a50; }
+  .btn-row { display: flex; gap: 6px; margin-top: 9px; justify-content: flex-end; }
+
+  /* 合計欄 */
+  .grand-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 6px;
+    padding: 9px 13px;
+    background: #f7f3ee;
+    border-radius: 8px;
+    font-size: 0.83rem;
+    color: #999;
+  }
+  .grand-row b { color: #3a2e1e; font-size: 0.94rem; }
+
+  .price-row {
+    display: grid;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .price-card {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 13px;
+    border-radius: 10px;
+    background: #eef5f1;
+    font-size: 0.83rem;
+    color: #6f7f78;
+  }
+  .price-card b {
+    color: #1f4f43;
+    font-size: 0.96rem;
+  }
+  .price-card.over {
+    background: #fff0f0;
+    color: #b05a52;
+  }
+  .price-card.over b {
+    color: #c0392b;
+  }
+  .price-diff {
+    padding: 0 4px;
+    font-size: 0.8rem;
+    color: #8b7d6a;
+    text-align: right;
+  }
+
+  .name-map {
+    margin-top: 12px;
+    padding: 14px;
+    border: 1px solid #e3ddd3;
+    border-radius: 12px;
+    background: #fcfaf7;
+    display: none;
+  }
+  .name-map h2 {
+    font-size: 0.95rem;
+    color: #4b4033;
+    margin-bottom: 6px;
+  }
+  .name-map .map-desc {
+    font-size: 0.78rem;
+    color: #9b8f80;
+    margin-bottom: 12px;
+    line-height: 1.45;
+  }
+  .name-map-list {
+    display: grid;
+    gap: 10px;
+  }
+  .name-map-item {
+    display: grid;
+    grid-template-columns: minmax(100px, 1fr) minmax(160px, 2fr);
+    gap: 10px;
+    align-items: center;
+  }
+  .name-map-item .orig {
+    font-size: 0.86rem;
+    color: #5c4c3c;
+    font-weight: 600;
+    word-break: break-all;
+  }
+  .name-map-item select {
+    width: 100%;
+    border: 1.5px solid #d9d1c4;
+    border-radius: 10px;
+    padding: 9px 10px;
+    font-size: 0.92rem;
+    background: white;
+    color: #3e3428;
+    font-family: inherit;
+  }
+  .name-map-item select:focus {
+    outline: none;
+    border-color: #8b6f47;
+  }
+  .map-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
+  }
+  .map-clear {
+    border: none;
+    border-radius: 8px;
+    padding: 7px 12px;
+    background: #efe7da;
+    color: #6b5a47;
+    cursor: pointer;
+    font-size: 0.82rem;
+  }
+  .map-clear:hover {
+    background: #e2d6c5;
+  }
+
+  /* 分組提示 */
+  .split-note {
+    font-size: 0.78rem;
+    color: #bbb;
+    margin-top: 6px;
+    text-align: right;
+  }
+
+  /* ── 藥價表編輯器 ── */
+  .pe-toggle-btn {
+    display: block;
+    width: 100%;
+    text-align: center;
+    margin-top: 16px;
+    padding: 9px;
+    font-size: 0.82rem;
+    color: #a08060;
+    background: #faf6f0;
+    border: 1.5px dashed #e0d0b8;
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, color 0.15s;
+  }
+  .pe-toggle-btn:hover { background: #f2ece2; color: #7a5f38; }
+
+  .price-editor-panel {
+    margin-top: 12px;
+    border: 1.5px solid #e0d4c0;
+    border-radius: 12px;
+    background: #faf8f5;
+    display: none;
+    overflow: hidden;
+  }
+  .price-editor-panel.open { display: block; }
+
+  .pe-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 14px 10px;
+    border-bottom: 1px solid #e8e0d4;
+  }
+  .pe-panel-title { font-size: 0.9rem; font-weight: 600; color: #5a4a35; }
+  .pe-panel-actions { display: flex; gap: 6px; }
+  .pe-btn {
+    padding: 5px 10px;
+    font-size: 0.78rem;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .pe-btn-add { background: #e8f0e4; color: #3a5f30; }
+  .pe-btn-add:hover { background: #d8e8d0; }
+  .pe-btn-reset { background: #f0ece4; color: #6b5a47; }
+  .pe-btn-reset:hover { background: #e2d8cc; }
+
+  .pe-table-wrap { max-height: 360px; overflow-y: auto; }
+  .pe-col-header {
+    display: grid;
+    grid-template-columns: 1fr 90px 30px;
+    gap: 4px;
+    padding: 5px 10px 4px;
+    font-size: 0.7rem;
+    color: #bbb;
+    background: #f4f0ea;
+    border-bottom: 1px solid #e8e0d4;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .pe-col-header span:nth-child(2) { text-align: right; }
+  .pe-row {
+    display: grid;
+    grid-template-columns: 1fr 90px 30px;
+    gap: 4px;
+    padding: 3px 8px;
+    border-bottom: 1px solid #f0ece4;
+    align-items: center;
+  }
+  .pe-row:last-child { border-bottom: none; }
+  .pe-row:hover { background: #fdfcfa; }
+  .pe-input-name, .pe-input-price {
+    border: 1px solid transparent;
+    border-radius: 5px;
+    padding: 4px 6px;
+    font-size: 0.85rem;
+    font-family: inherit;
+    color: #3a2e1e;
+    background: transparent;
+    width: 100%;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .pe-input-name:hover, .pe-input-price:hover { border-color: #d8ccbc; background: white; }
+  .pe-input-name:focus, .pe-input-price:focus { outline: none; border-color: #8b6f47; background: white; }
+  .pe-input-price { text-align: right; }
+  .pe-del-btn {
+    width: 24px; height: 24px;
+    border: none; border-radius: 5px;
+    background: transparent; color: #ccc;
+    cursor: pointer; font-size: 1rem;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    padding: 0;
+  }
+  .pe-del-btn:hover { background: #fee8e8; color: #c0392b; }
+
+  .pe-panel-footer {
+    padding: 7px 14px;
+    border-top: 1px solid #e8e0d4;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .pe-drug-count { font-size: 0.74rem; color: #bbb; }
+  .pe-saved-note {
+    font-size: 0.74rem; color: #5a9a6a;
+    opacity: 0; transition: opacity 0.4s;
+  }
+  .pe-saved-note.show { opacity: 1; }
+
+  /* ── 微調劑量 ── */
+  .adjust-toggle-btn {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+    padding: 8px;
+    font-size: 0.82rem;
+    color: #5a7a68;
+    background: #f0f8f4;
+    border: 1.5px dashed #b8d8cc;
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: center;
+    transition: background 0.15s, color 0.15s;
+  }
+  .adjust-toggle-btn:hover { background: #e4f2ec; color: #3a6a5a; }
+  .adjust-panel {
+    margin-top: 10px;
+    border: 1.5px solid #b8d8cc;
+    border-radius: 12px;
+    background: #f5fbf8;
+    display: none;
+    overflow: hidden;
+  }
+  .adjust-panel.open { display: block; }
+  .adj-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px 9px;
+    border-bottom: 1px solid #d0e8e0;
+  }
+  .adj-panel-title { font-size: 0.88rem; font-weight: 600; color: #3a5a4e; }
+  .adj-reset-btn {
+    padding: 4px 10px;
+    font-size: 0.76rem;
+    border: none; border-radius: 6px;
+    background: #e4f0ec; color: #4a7a6a;
+    cursor: pointer; font-family: inherit;
+  }
+  .adj-reset-btn:hover { background: #d4e8e0; }
+  .adj-group {
+    padding: 10px 14px 8px;
+    border-bottom: 1px solid #dff0e8;
+  }
+  .adj-group:last-of-type { border-bottom: none; }
+  .adj-group-title {
+    font-size: 0.75rem; font-weight: 600;
+    color: #6a8a80; margin-bottom: 7px;
+    letter-spacing: 0.04em;
+  }
+  .adj-grid {
+    display: grid;
+    grid-template-columns: 1fr 72px 18px;
+    gap: 3px 6px;
+    align-items: center;
+  }
+  .adj-drug-name { font-size: 0.85rem; color: #3a2e1e; }
+  .adj-ratio { font-size: 0.74rem; color: #b0a898; margin-left: 4px; font-family: "SF Mono", "Menlo", monospace; }
+  .adj-input {
+    width: 100%;
+    border: 1.5px solid #c8dfd8;
+    border-radius: 6px;
+    padding: 3px 6px;
+    font-size: 0.85rem;
+    font-family: "SF Mono", "Menlo", monospace;
+    text-align: right;
+    color: #2a4a42;
+    background: white;
+  }
+  .adj-input:focus { outline: none; border-color: #3a6a5f; }
+  .adj-unit { font-size: 0.74rem; color: #bbb; }
+  .adj-sum-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.78rem; color: #888;
+    margin-top: 6px; padding-top: 5px;
+    border-top: 1px dashed #d8ede6;
+  }
+  .adj-sum-row b { color: #2a4a42; }
+  .adj-price-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    padding: 9px 14px;
+    background: #eef8f3;
+    border-top: 1px solid #d0e8e0;
+    font-size: 0.82rem; color: #5a7a6a;
+  }
+  .adj-price-bar b { font-size: 0.94rem; color: #1a4a3a; }
+  .adj-price-bar.over b { color: #c0392b; }
+  .adj-price-label { font-size: 0.74rem; color: #8aa89a; margin-right: auto; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>藥物比例換算器</h1>
+  <p class="subtitle">直接貼上「藥方範本」格式即可，自動換算 30g 並分成兩張藥單（A 20g＋B 10g）</p>
+
+  <label>全方比例（所有藥味）</label>
+  <textarea id="input-main"
+    placeholder="可直接貼上「藥方範本」格式&#10;例：北沙參 3、石斛 2、熟地 3&#10;也支援純數字輸入"
+    rows="3"
+    oninput="onInputChange()"></textarea>
+  <div class="count-bar" id="count-main"></div>
+  <p class="hint">可輸入「藥名＋比例」或純數字；自動以最佳比例分 A 組（20g）/ B 組（10g）</p>
+
+  <div class="total-row">
+    <label>總量</label>
+    <input type="number" id="total-main" value="30" min="1" oninput="onInputChange()">
+    <span>克（g）</span>
+  </div>
+
+  <button class="btn" onclick="calculate()">換算並自動分組</button>
+  <div class="error" id="err-main"></div>
+
+  <!-- ══════════ 結果 ══════════ -->
+  <div class="results" id="results">
+
+    <!-- 全方參考 -->
+    <div class="block">
+      <div class="block-header">
+        <div class="block-title">
+          <span class="badge badge-ref" id="ref-badge">全方 30g</span>
+          <span class="block-meta" id="ref-meta"></span>
+        </div>
+        <button class="copy-btn copy-ref" onclick="copyData('ref')">複製全方</button>
+      </div>
+      <!-- A 組 chips -->
+      <div class="ref-section">
+        <div class="ref-row-label" id="ref-a-label"></div>
+        <div class="num-row" id="ref-nums-a"></div>
+      </div>
+      <!-- B 組 chips -->
+      <div class="ref-section" id="ref-b-section">
+        <div class="ref-row-label" id="ref-b-label"></div>
+        <div class="num-row" id="ref-nums-b"></div>
+      </div>
+      <div class="sum-line" id="sum-ref"></div>
+      <div class="split-note" id="split-note"></div>
+    </div>
+
+    <hr class="block-divider">
+
+    <!-- 藥單 A -->
+    <div class="block" id="block-a">
+      <div class="block-header">
+        <div class="block-title">
+          <span class="badge badge-a">藥單 A</span>
+          <span class="block-meta" id="a-meta"></span>
+        </div>
+        <button class="copy-btn copy-a" onclick="copyData('a')">複製</button>
+      </div>
+      <div class="num-row" id="nums-a"></div>
+      <div class="sum-line" id="sum-a"></div>
+    </div>
+
+    <!-- 藥單 B -->
+    <div class="block" id="block-b">
+      <hr class="block-divider" id="ab-hr">
+      <div class="block-header" style="margin-bottom:6px;">
+        <div class="block-title">
+          <span class="badge badge-b">藥單 B</span>
+          <span class="block-meta" id="b-meta"></span>
+        </div>
+      </div>
+
+      <div class="row-sub-label">10 g</div>
+      <div class="num-row" id="nums-b"></div>
+      <div class="sum-line" id="sum-b"></div>
+
+      <div class="row-sub-label">× 2（= 20 g）</div>
+      <div class="num-row" id="nums-b2"></div>
+      <div class="sum-line" id="sum-b2"></div>
+
+      <div class="btn-row">
+        <button class="copy-btn copy-b"  onclick="copyData('b')">複製 10g</button>
+        <button class="copy-btn copy-x2" onclick="copyData('b2')">複製 ×2</button>
+      </div>
+    </div>
+
+    <!-- A＋B 合計 -->
+    <div class="grand-row" id="grand-row">
+      <span>藥單 A ＋ 藥單 B</span>
+      <b id="grand-val"></b>
+    </div>
+
+    <div class="price-row" id="price-row">
+      <div class="price-card" id="price-a-card">
+        <span id="price-a-label">A 組總價格</span>
+        <b id="price-a-val"></b>
+      </div>
+      <div class="price-card" id="price-b-card">
+        <span id="price-b-label">B 組 ×2 總價格</span>
+        <b id="price-b-val"></b>
+      </div>
+      <div class="price-diff" id="price-diff"></div>
+    </div>
+
+    <!-- 微調劑量 -->
+    <button class="adjust-toggle-btn" id="adj-toggle-btn" onclick="toggleAdjust()">⚖ 微調劑量</button>
+    <div class="adjust-panel" id="adjust-panel">
+      <div class="adj-panel-header">
+        <span class="adj-panel-title">劑量微調</span>
+        <button class="adj-reset-btn" onclick="resetAdjust()">重置為自動</button>
+      </div>
+      <div id="adj-body"></div>
+      <div class="adj-price-bar" id="adj-price-bar"></div>
+    </div>
+
+    <div class="name-map" id="name-map">
+      <h2>藥名對照</h2>
+      <div class="map-desc">找不到單價的藥名可以在這裡選擇對應的標準藥名，選完會立即重新計價。</div>
+      <div class="name-map-list" id="name-map-list"></div>
+      <div class="map-actions">
+        <button class="map-clear" type="button" onclick="clearNameMappings()">清除所有對照</button>
+      </div>
+    </div>
+
+  </div><!-- /results -->
+
+  <!-- ══════════ 藥價表編輯器 ══════════ -->
+  <button class="pe-toggle-btn" onclick="togglePriceEditor()" id="pe-toggle-btn">⚙ 管理藥價表</button>
+  <div class="price-editor-panel" id="price-editor-panel">
+    <div class="pe-panel-header">
+      <span class="pe-panel-title">藥價表</span>
+      <div class="pe-panel-actions">
+        <button class="pe-btn pe-btn-add" onclick="addPriceRow()">＋ 新增藥物</button>
+        <button class="pe-btn pe-btn-reset" onclick="resetPriceTable()">重設預設值</button>
+      </div>
+    </div>
+    <div class="pe-table-wrap">
+      <div class="pe-col-header">
+        <span>藥名</span><span>單價（元/g）</span><span></span>
+      </div>
+      <div id="price-table-list-body"></div>
+    </div>
+    <div class="pe-panel-footer">
+      <span class="pe-drug-count" id="pe-drug-count"></span>
+      <span class="pe-saved-note" id="pe-saved-note">已儲存</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const r1 = v => Math.round(v * 10) / 10;
+
+const DEFAULT_PRICE_TABLE = {
+  "酸棗仁": 11.7,
+  "阿膠": 8.78,
+  "白及": 8.3,
+  "細辛": 8.3,
+  "三七": 7.8,
+  "黃連": 7.8,
+  "地龍": 7.61,
+  "天麻": 5.66,
+  "羌活": 5.37,
+  "金銀花": 5.37,
+  "殭蠶": 5.28,
+  "(浙)貝母": 5.27,
+  "五味子": 4.68,
+  "延胡索": 4.59,
+  "肉蓯蓉": 4.4,
+  "連翹": 4.4,
+  "半夏(製)": 4.1,
+  "當歸": 4.1,
+  "黨參": 4.1,
+  "石斛": 3.9,
+  "防風": 3.9,
+  "紅花": 3.9,
+  "蔓荊子": 3.75,
+  "辛夷": 3.71,
+  "蒼朮": 3.71,
+  "白鮮皮": 3.51,
+  "麥門冬": 3.51,
+  "菊花": 3.42,
+  "杜仲": 3.12,
+  "神麴": 3.12,
+  "柴胡": 2.93,
+  "附子(製)": 2.93,
+  "砂仁": 2.93,
+  "鉤藤": 2.93,
+  "威靈仙": 2.93,
+  "地骨皮": 2.73,
+  "升麻": 2.64,
+  "白朮": 2.64,
+  "牡丹皮": 2.64,
+  "蒲黃": 2.63,
+  "巴戟天": 2.54,
+  "白花蛇舌草": 2.54,
+  "石菖蒲": 2.54,
+  "遠志": 2.54,
+  "(北)沙參": 2.45,
+  "白芍": 2.34,
+  "枳實": 2.34,
+  "桃仁": 2.34,
+  "黃柏": 2.34,
+  "鬱金": 2.34,
+  "車前子": 2.25,
+  "益智仁": 2.25,
+  "淫羊藿": 2.25,
+  "赤芍": 2.15,
+  "杏仁": 2.15,
+  "夏枯草": 2.15,
+  "骨碎補": 2.15,
+  "雞內金": 2.15,
+  "紫菀": 1.98,
+  "天花粉": 1.95,
+  "何首烏": 1.95,
+  "板藍根": 1.95,
+  "厚朴": 1.95,
+  "茯神": 1.95,
+  "桔梗": 1.95,
+  "茵陳": 1.95,
+  "栝樓仁": 1.95,
+  "黃耆": 1.95,
+  "菟絲子": 1.95,
+  "蒿本": 1.95,
+  "竹茹": 1.86,
+  "桂枝": 1.82,
+  "麻子仁丸": 1.8,
+  "川芎": 1.76,
+  "土茯苓": 1.76,
+  "大黃": 1.76,
+  "丹參": 1.76,
+  "牛膝(川)": 1.76,
+  "白茅根": 1.76,
+  "白蒺藜": 1.76,
+  "知母": 1.76,
+  "乳香": 1.76,
+  "桑白皮": 1.76,
+  "益母草": 1.76,
+  "荊芥": 1.76,
+  "茯苓": 1.76,
+  "烏賊骨(海螵蛸)": 1.76,
+  "烏藥(台)": 1.76,
+  "麻黃": 1.76,
+  "魚腥草": 1.76,
+  "黃芩": 1.76,
+  "路路通": 1.76,
+  "薏苡仁": 1.76,
+  "雞血藤": 1.76,
+  "調胃承氣湯": 1.71,
+  "合歡皮": 1.67,
+  "乾薑": 1.67,
+  "熟地": 1.67,
+  "澤瀉": 1.67,
+  "藿香": 1.67,
+  "續斷": 1.67,
+  "桑葉": 1.66,
+  "山楂": 1.56,
+  "山藥": 1.56,
+  "木香": 1.56,
+  "半枝蓮": 1.56,
+  "生地黃": 1.56,
+  "白芷": 1.56,
+  "生甘草": 1.56,
+  "夜交藤": 1.56,
+  "芡實": 1.56,
+  "枸杞子": 1.56,
+  "草決明(決明子)": 1.56,
+  "陳皮": 1.56,
+  "蒲公英": 1.56,
+  "蒼耳子": 1.56,
+  "薑黃": 1.56,
+  "桑枝": 1.49,
+  "女貞子": 1.47,
+  "川楝子": 1.47,
+  "化石草": 1.47,
+  "木瓜": 1.47,
+  "枇杷葉": 1.47,
+  "香附": 1.47,
+  "枳殼": 1.47,
+  "浮小麥": 1.47,
+  "補骨脂": 1.47,
+  "玄參": 1.37,
+  "仙鶴草": 1.37,
+  "桑寄生": 1.37,
+  "葛根(野葛)": 1.37,
+  "牡蠣": 1.28,
+  "麥芽": 1.28,
+  "澤蘭": 1.28,
+  "石膏": 1.17
+};
+
+function loadSavedPriceTable() {
+  try {
+    const saved = localStorage.getItem('drugPriceTable');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) return parsed;
+    }
+  } catch(e) {}
+  return { ...DEFAULT_PRICE_TABLE };
+}
+let PRICE_TABLE = loadSavedPriceTable();
+
+const PRICE_ALIASES = {
+  "沙參": "(北)沙參",
+  "北沙參": "(北)沙參",
+  "甘草": "生甘草",
+  "黃芪": "黃耆",
+  "栝樓": "栝樓仁",
+  "全瓜蔞": "栝樓仁",
+  "瓜蔞": "栝樓仁",
+  "瓜蔞仁": "栝樓仁",
+  // 常用異名
+  "生地": "生地黃",
+  "丹皮": "牡丹皮",
+  "丹皮(牡丹皮)": "牡丹皮",
+  "熟地黃": "熟地",
+  "元胡": "延胡索",
+  "玄胡": "延胡索",
+  "浙貝": "(浙)貝母",
+  "浙貝母": "(浙)貝母",
+  "貝母": "(浙)貝母",
+  "象貝": "(浙)貝母",
+  "象貝母": "(浙)貝母",
+  "大貝": "(浙)貝母",
+  "大貝母": "(浙)貝母",
+  "沙苑子": "益智仁",
+  "川牛膝": "牛膝(川)",
+  "牛膝": "牛膝(川)",
+  "海螵蛸": "烏賊骨(海螵蛸)",
+  "烏賊骨": "烏賊骨(海螵蛸)",
+  "烏藥": "烏藥(台)",
+  "台烏藥": "烏藥(台)",
+  "半夏": "半夏(製)",
+  "製半夏": "半夏(製)",
+  "法半夏": "半夏(製)",
+  "薑半夏": "半夏(製)",
+  "姜半夏": "半夏(製)",
+  "清半夏": "半夏(製)",
+  "竹瀝半夏": "半夏(製)",
+  "製附子": "附子(製)",
+  "附子": "附子(製)",
+  "熟附子": "附子(製)",
+  "黑附片": "附子(製)",
+  "白附片": "附子(製)",
+  "淡附片": "附子(製)",
+  "決明子": "草決明(決明子)",
+  "草決明": "草決明(決明子)",
+  "葛根": "葛根(野葛)",
+  "野葛": "葛根(野葛)",
+  "麥冬": "麥門冬",
+  "麥門冬": "麥門冬",
+  "首烏": "何首烏",
+  "首烏藤": "夜交藤",
+  "薏仁": "薏苡仁",
+  "薏米": "薏苡仁",
+  "酸棗": "酸棗仁",
+  "棗仁": "酸棗仁",
+  "蒲黃炒": "蒲黃",
+  "炒蒲黃": "蒲黃",
+  "芍藥": "白芍",
+  "骨皮": "地骨皮",
+  "枸杞": "枸杞子",
+
+  // ── 炮製前綴（生/炙/炒/焦/煅/鹽/酒/蜜/土炒）──
+  "生石膏": "石膏",
+  "生黃耆": "黃耆",
+  "炙黃耆": "黃耆",
+  "北黃耆": "黃耆",
+  "炒白朮": "白朮",
+  "土炒白朮": "白朮",
+  "炒白芍": "白芍",
+  "酒白芍": "白芍",
+  "生麥芽": "麥芽",
+  "炒麥芽": "麥芽",
+  "炒山楂": "山楂",
+  "焦山楂": "山楂",
+  "炒神麴": "神麴",
+  "焦神麴": "神麴",
+  "生牡蠣": "牡蠣",
+  "煅牡蠣": "牡蠣",
+  "炒枳殼": "枳殼",
+  "炒枳實": "枳實",
+  "生知母": "知母",
+  "鹽知母": "知母",
+  "鹽黃柏": "黃柏",
+  "川黃柏": "黃柏",
+  "炒黃柏": "黃柏",
+  "生黃芩": "黃芩",
+  "炒黃芩": "黃芩",
+  "川黃連": "黃連",
+  "酒黃連": "黃連",
+  "生薏仁": "薏苡仁",
+  "炒薏仁": "薏苡仁",
+  "生薏苡仁": "薏苡仁",
+  "炒薏苡仁": "薏苡仁",
+  "苦杏仁": "杏仁",
+  "炒杏仁": "杏仁",
+  "炒桃仁": "桃仁",
+  "全當歸": "當歸",
+  "當歸身": "當歸",
+  "當歸尾": "當歸",
+  "酒當歸": "當歸",
+  "炮薑": "乾薑",
+  "乾薑片": "乾薑",
+  "炮附子": "附子(製)",
+  "生大黃": "大黃",
+  "熟大黃": "大黃",
+  "酒大黃": "大黃",
+  "製大黃": "大黃",
+
+  // ── 省略名/別稱/地名前綴 ──
+  "白茯苓": "茯苓",
+  "赤茯苓": "茯苓",
+  "赤苓": "茯苓",
+  "雲苓": "茯苓",
+  "銀花": "金銀花",
+  "雙花": "金銀花",
+  "忍冬花": "金銀花",
+  "花粉": "天花粉",
+  "廣藿香": "藿香",
+  "桑皮": "桑白皮",
+  "杭菊": "菊花",
+  "杭菊花": "菊花",
+  "白菊花": "菊花",
+  "黃菊花": "菊花",
+  "連翹殼": "連翹",
+  "生黃連": "黃連",
+  "生黃柏": "黃柏",
+  "生丹參": "丹參",
+  "炒丹參": "丹參",
+  "生柴胡": "柴胡",
+  "醋柴胡": "柴胡",
+  "炒柴胡": "柴胡",
+  "生升麻": "升麻",
+  "酒升麻": "升麻",
+  "生桔梗": "桔梗",
+  "炒桔梗": "桔梗",
+  "生陳皮": "陳皮",
+  "廣陳皮": "陳皮",
+  "新會皮": "陳皮",
+  "炒砂仁": "砂仁",
+  "春砂仁": "砂仁",
+  "生杜仲": "杜仲",
+  "炒杜仲": "杜仲",
+  "鹽杜仲": "杜仲",
+  "炒續斷": "續斷",
+  "生益智仁": "益智仁",
+  "鹽益智仁": "益智仁",
+  "炒菟絲子": "菟絲子",
+  "鹽菟絲子": "菟絲子",
+  "炒補骨脂": "補骨脂",
+  "鹽補骨脂": "補骨脂",
+  "炒淫羊藿": "淫羊藿",
+  "炙淫羊藿": "淫羊藿",
+  "炒芡實": "芡實",
+  "炒車前子": "車前子",
+  "鹽車前子": "車前子",
+  "炒澤瀉": "澤瀉",
+  "鹽澤瀉": "澤瀉",
+  "炒女貞子": "女貞子",
+  "酒女貞子": "女貞子",
+  "炒酸棗仁": "酸棗仁",
+  "生酸棗仁": "酸棗仁",
+  "炒遠志": "遠志",
+  "製遠志": "遠志",
+  "炒石菖蒲": "石菖蒲",
+  "炒夏枯草": "夏枯草",
+  "炒川芎": "川芎",
+  "酒川芎": "川芎",
+  "炒赤芍": "赤芍",
+  "酒赤芍": "赤芍",
+  "炒白芷": "白芷",
+  "炒防風": "防風",
+  "炒荊芥": "荊芥",
+  "荊芥穗": "荊芥",
+  "炒羌活": "羌活",
+  "炒威靈仙": "威靈仙",
+  "酒威靈仙": "威靈仙",
+  "生何首烏": "何首烏",
+  "製何首烏": "何首烏",
+  "炒何首烏": "何首烏",
+  "生玄參": "玄參",
+  "炒玄參": "玄參",
+  "生板藍根": "板藍根",
+  "大青葉": "板藍根",
+  "鮮魚腥草": "魚腥草",
+  "乾魚腥草": "魚腥草",
+  "炒蒲公英": "蒲公英",
+  "鮮蒲公英": "蒲公英",
+  "炒白花蛇舌草": "白花蛇舌草",
+  "炒白鮮皮": "白鮮皮",
+  "炒白蒺藜": "白蒺藜",
+  "刺蒺藜": "白蒺藜",
+  "生地骨皮": "地骨皮",
+  "炒地骨皮": "地骨皮",
+  "炒桑白皮": "桑白皮",
+  "蜜桑白皮": "桑白皮",
+  "炒桑葉": "桑葉",
+  "炒桑寄生": "桑寄生",
+  "酒桑寄生": "桑寄生",
+  "炒牛膝": "牛膝(川)",
+  "鹽牛膝": "牛膝(川)",
+  "懷牛膝": "牛膝(川)",
+  "炒骨碎補": "骨碎補",
+  "炒巴戟天": "巴戟天",
+  "鹽巴戟天": "巴戟天",
+  "炒肉蓯蓉": "肉蓯蓉",
+  "酒肉蓯蓉": "肉蓯蓉",
+  "炒天麻": "天麻",
+  "生天麻": "天麻",
+  "炒鉤藤": "鉤藤",
+  "炒殭蠶": "殭蠶",
+  "炒地龍": "地龍",
+  "炒三七": "三七",
+  "生三七": "三七",
+  "炒蒼朮": "蒼朮",
+  "炒厚朴": "厚朴",
+  "炒木香": "木香",
+  "炒香附": "香附",
+  "醋香附": "香附",
+  "炒鬱金": "鬱金",
+  "醋鬱金": "鬱金",
+  "炒乳香": "乳香",
+  "制乳香": "乳香",
+  "炒紅花": "紅花",
+  "炒雞血藤": "雞血藤",
+  "炒益母草": "益母草",
+  "炒雞內金": "雞內金",
+  "炒合歡皮": "合歡皮",
+  "炒夜交藤": "夜交藤",
+  "生夜交藤": "夜交藤",
+  "炒茵陳": "茵陳",
+  "嫩茵陳": "茵陳",
+  "炒竹茹": "竹茹",
+  "薑竹茹": "竹茹",
+  "炒枇杷葉": "枇杷葉",
+  "蜜枇杷葉": "枇杷葉",
+  "炒桂枝": "桂枝",
+  "炒麻黃": "麻黃",
+  "生麻黃": "麻黃",
+  "炙麻黃": "麻黃",
+  "炒細辛": "細辛",
+  "生細辛": "細辛",
+  "炒辛夷": "辛夷",
+  "炒蔓荊子": "蔓荊子",
+  "炒蒿本": "蒿本",
+  "藁本": "蒿本",
+  "炒五味子": "五味子",
+  "醋五味子": "五味子",
+  "生五味子": "五味子",
+  "炒黃精": "黃耆",
+  "炙黃精": "黃耆",
+  "炒山藥": "山藥",
+  "生山藥": "山藥",
+  "炒黨參": "黨參",
+  "炒石斛": "石斛",
+  "鮮石斛": "石斛",
+  "炒阿膠": "阿膠",
+  "阿膠珠": "阿膠",
+  "炒白及": "白及",
+  "生白及": "白及",
+  "炒仙鶴草": "仙鶴草",
+  "炒白茅根": "白茅根",
+  "茅根": "白茅根",
+  "炒蒼耳子": "蒼耳子",
+  "炒天花粉": "天花粉",
+  "炒澤蘭": "澤蘭",
+  "炒薑黃": "薑黃",
+  "炒桑枝": "桑枝",
+  "炒土茯苓": "土茯苓",
+  "炒木瓜": "木瓜",
+  "炒川楝子": "川楝子",
+  "醋川楝子": "川楝子",
+  "炒枸杞子": "枸杞子",
+  "炒麥門冬": "麥門冬",
+  "炒半枝蓮": "半枝蓮",
+  "炒黃柏": "黃柏"
+};
+
+let PRICE_INDEX = new Map(
+  Object.entries(PRICE_TABLE).map(([name, price]) => [normalizeDrugName(name), price])
+);
+
+const PRICE_ALIAS_INDEX = new Map(
+  Object.entries(PRICE_ALIASES).map(([alias, target]) => [normalizeDrugName(alias), normalizeDrugName(target)])
+);
+
+// 儲存最後計算結果
+let store = {
+  ref: [],
+  a: [],
+  b: [],
+  b2: [],
+  items: [],
+  aItems: [],
+  bItems: [],
+  scale: 1,
+  priceAFull: null,
+  priceBFull2: null,
+  nameOverrides: {},
+  overrideA: null,
+  overrideB: null,
+  singleMode: false
+};
+
+function normalizeDrugName(name) {
+  return String(name || '').replace(/\s+/g, '').replace(/[()（）]/g, '');
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatOneDecimal(value) {
+  return (Math.round(value * 10) / 10).toFixed(1).replace(/\.0$/, '');
+}
+
+function formatMoney(value) {
+  return (Math.round(value * 100) / 100).toFixed(2).replace(/\.?0+$/, '');
+}
+
+function isMetaText(name) {
+  return /藥方|範本|功效|說明|主治|適應|用途|備註|注意|禁忌|來源|版本|編號|方名|名稱|示意|範例|註/.test(name);
+}
+
+function stripLabelPrefix(name) {
+  const text = String(name || '').trim();
+  const idx = Math.max(text.lastIndexOf('：'), text.lastIndexOf(':'));
+  if (idx >= 0) {
+    const tail = text.slice(idx + 1).trim();
+    if (tail) return tail;
+  }
+  return text;
+}
+
+/* ── 解析藥方範本或純數字 ── */
+function parsePrescription(raw) {
+  // 剔除各種格式雜訊後再解析
+  const text = raw.trim()
+    .replace(/[←<][^\n\r]*/g, '')           // ← 備註
+    .replace(/【[^\n\r】]*】/g, '')           // 【分組標題】
+    .replace(/（[^（）\n\r]*）/g, '')         // （中文括號備註）
+    .replace(/\([^()\n\r]*\)/g, '')          // (英文括號備註)
+    .replace(/[─━═─—]{2,}/g, '')            // ────／════ 分隔線
+    .replace(/([0-9])克/g, '$1')             // 數字後的「克」單位
+    .replace(/\u3000/g, '、')                // 全形空格→、
+    .replace(/\s*[+＋]\s*/g, '、')           // + / ＋ →、
+    .replace(/([0-9])\s{2,}/g, '$1、');      // 數字後 2+ 個半形空格→、
+  if (!text) return null;
+
+  const namedItems = [];
+  const pairRe = /([^0-9\r\n,，、]+?)\s*([0-9]+(?:\.[0-9]+)?)(?=\s*(?:[、,，\n\r]|$))/g;
+  let match;
+  while ((match = pairRe.exec(text)) !== null) {
+    const name = stripLabelPrefix(match[1]);
+    const ratioText = match[2];
+    const ratio = parseFloat(ratioText);
+    if (!name || !Number.isFinite(ratio) || ratio <= 0) continue;
+    if (isMetaText(name)) continue;
+    namedItems.push({ name, ratio, ratioText });
+  }
+  if (namedItems.length) {
+    return {
+      items: namedItems,
+      ratios: namedItems.map(item => item.ratio),
+      mode: 'named'
+    };
+  }
+
+  const tokens = text.split(/[\s,，、]+/).filter(Boolean);
+  if (!tokens.length) return { invalid: true };
+  const nums = tokens.map(t => parseFloat(t));
+  if (nums.some(n => !Number.isFinite(n) || n <= 0)) return { invalid: true };
+
+  return {
+    items: nums.map((ratio, index) => ({
+      name: `第${index + 1}味`,
+      ratio,
+      ratioText: tokens[index]
+    })),
+    ratios: nums,
+    mode: 'numeric'
+  };
+}
+
+/* ── 按比例換算（最大餘數法，保證加總精確等於 total）── */
+function toGrams(ratios, total) {
+  const sum = ratios.reduce((s, r) => s + r, 0);
+  const totalTenths = Math.round(total * 10);
+  const exact = ratios.map(r => r / sum * totalTenths);
+  const floors = exact.map(v => Math.floor(v));
+  const remainder = totalTenths - floors.reduce((s, v) => s + v, 0);
+
+  const order = exact
+    .map((v, i) => ({ i, frac: v - Math.floor(v) }))
+    .sort((a, b) => b.frac - a.frac);
+
+  const tenths = [...floors];
+  for (let k = 0; k < remainder; k++) tenths[order[k].i]++;
+
+  return tenths.map(v => v / 10);
+}
+
+function lookupUnitPrice(name) {
+  const key = normalizeDrugName(name);
+  const override = store.nameOverrides[key];
+  if (override === '__ignore__') return null;
+  if (override && PRICE_INDEX.has(override)) return PRICE_INDEX.get(override);
+
+  if (PRICE_INDEX.has(key)) return PRICE_INDEX.get(key);
+
+  const aliasTarget = PRICE_ALIAS_INDEX.get(key);
+  if (aliasTarget && PRICE_INDEX.has(aliasTarget)) return PRICE_INDEX.get(aliasTarget);
+
+  return null;
+}
+
+function resolvePriceName(name) {
+  const key = normalizeDrugName(name);
+  const override = store.nameOverrides[key];
+  if (override === '__ignore__') return null;
+  if (override && PRICE_INDEX.has(override)) return override;
+
+  if (PRICE_INDEX.has(key)) return key;
+  const aliasTarget = PRICE_ALIAS_INDEX.get(key);
+  if (aliasTarget && PRICE_INDEX.has(aliasTarget)) return aliasTarget;
+  return null;
+}
+
+function suggestPriceCandidates(name, limit = 8) {
+  const raw = String(name || '');
+  const key = normalizeDrugName(raw);
+  const chars = new Set([...key]);
+  const allNames = Object.keys(PRICE_TABLE);
+
+  const scored = allNames.map(candidate => {
+    const cKey = normalizeDrugName(candidate);
+    let score = 0;
+    if (cKey === key) score += 1000;
+    if (cKey.includes(key) || key.includes(cKey)) score += 300;
+    if (raw.includes(candidate) || candidate.includes(raw)) score += 200;
+    for (const ch of chars) if (cKey.includes(ch)) score += 8;
+    const sharedLen = sharedPrefixLength(key, cKey);
+    score += sharedLen * 15;
+    return { candidate, score };
+  });
+
+  return scored
+    .sort((a, b) => b.score - a.score || a.candidate.length - b.candidate.length)
+    .slice(0, limit)
+    .map(x => x.candidate);
+}
+
+function sharedPrefixLength(a, b) {
+  const n = Math.min(a.length, b.length);
+  let i = 0;
+  while (i < n && a[i] === b[i]) i++;
+  return i;
+}
+
+function sumPrice(items, grams) {
+  let total = 0;
+  const missing = [];
+
+  items.forEach((item, index) => {
+    const unitPrice = lookupUnitPrice(item.name);
+    if (unitPrice == null) {
+      missing.push(item.name);
+      return;
+    }
+    total += grams[index] * unitPrice;
+  });
+
+  return {
+    total,
+    missing: [...new Set(missing)]
+  };
+}
+
+function collectUnitPrices(items) {
+  return items.map(item => lookupUnitPrice(item.name));
+}
+
+// weightedPriceSum = Σ(ratio_i × unitPrice_i)
+// 實際費用 = weightedPriceSum / ratioSum × 20g（A 組）或 × 20g（B×2）
+function makeSubsetStats(items, ratios, prices) {
+  const N = items.length;
+  const limit = 1 << N;
+  const subsetsByCount = Array.from({ length: N + 1 }, () => []);
+
+  for (let mask = 0; mask < limit; mask++) {
+    let count = 0;
+    let ratioSum = 0;
+    let weightedPriceSum = 0;
+    let valid = true;
+
+    for (let i = 0; i < N; i++) {
+      if (!(mask & (1 << i))) continue;
+      count++;
+      ratioSum += ratios[i];
+      const price = prices[i];
+      if (price == null) {
+        valid = false;
+      } else {
+        weightedPriceSum += ratios[i] * price;
+      }
+    }
+
+    subsetsByCount[count].push({
+      mask,
+      count,
+      ratioSum,
+      weightedPriceSum,
+      valid
+    });
+  }
+
+  return subsetsByCount;
+}
+
+function chooseBestSplitByPrice(items, ratios, maxRatioDiff = Infinity) {
+  const N = items.length;
+  const prices = collectUnitPrices(items);
+  if (prices.some(p => p == null)) {
+    return null;
+  }
+
+  const half = Math.floor(N / 2);
+  const leftItems = items.slice(0, half);
+  const rightItems = items.slice(half);
+  const leftRatios = ratios.slice(0, half);
+  const rightRatios = ratios.slice(half);
+  const leftPrices = prices.slice(0, half);
+  const rightPrices = prices.slice(half);
+
+  const leftSubs = makeSubsetStats(leftItems, leftRatios, leftPrices);
+  const rightSubs = makeSubsetStats(rightItems, rightRatios, rightPrices);
+
+  // 全方的比例加權總價 Σ(ratio_i × unitPrice_i)
+  const totalRatio = ratios.reduce((s, r) => s + r, 0);
+  const totalWeightedPrice = ratios.reduce((s, r, i) => s + r * prices[i], 0);
+  const targetA = totalRatio * 2 / 3;
+  const minA = Math.max(1, N - 12);
+  const maxA = Math.min(N - 1, 12);
+
+  let best = null;
+
+  for (let lc = 0; lc < leftSubs.length; lc++) {
+    for (const left of leftSubs[lc]) {
+      for (let rc = 0; rc < rightSubs.length; rc++) {
+        const totalCount = left.count + rc;
+        if (totalCount < minA || totalCount > maxA) continue;
+        for (const right of rightSubs[rc]) {
+          const mask = left.mask | (right.mask << half);
+          const ratioSumA = left.ratioSum + right.ratioSum;
+          const ratioSumB = totalRatio - ratioSumA;
+          const wPriceSumA = left.weightedPriceSum + right.weightedPriceSum;
+          const wPriceSumB = totalWeightedPrice - wPriceSumA;
+          // 實際費用 = (Σ ratio_i × unitPrice_i) / Σ ratio_i × 20g
+          const costA  = ratioSumA > 0 ? wPriceSumA / ratioSumA * 20 : 0;
+          const costB2 = ratioSumB > 0 ? wPriceSumB / ratioSumB * 20 : 0;
+          const scale = Math.min(1,
+            costA  > 0 ? 40 / costA  : 1,
+            costB2 > 0 ? 40 / costB2 : 1
+          );
+          const maxPrice = Math.max(costA, costB2);
+          const priceGap = Math.abs(costA - costB2);
+          const cand = {
+            mask,
+            count: totalCount,
+            ratioDiff: Math.abs(ratioSumA - targetA),
+            scale,
+            maxPrice,
+            priceGap,
+            priceAFull: costA,
+            priceBFull2: costB2,
+            feasible: scale >= 0.999999,
+            overA: Math.max(0, costA  * scale - 40),
+            overB: Math.max(0, costB2 * scale - 40)
+          };
+
+          // 超出比例容許範圍，跳過（比例均衡是首要紅線）
+          if (cand.ratioDiff > maxRatioDiff) continue;
+
+          if (
+            !best ||
+            cand.scale > best.scale + 1e-9 ||
+            (Math.abs(cand.scale - best.scale) <= 1e-9 && cand.maxPrice < best.maxPrice - 1e-9) ||
+            (Math.abs(cand.scale - best.scale) <= 1e-9 && Math.abs(cand.maxPrice - best.maxPrice) <= 1e-9 && cand.priceGap < best.priceGap - 1e-9) ||
+            (Math.abs(cand.scale - best.scale) <= 1e-9 && Math.abs(cand.maxPrice - best.maxPrice) <= 1e-9 && Math.abs(cand.priceGap - best.priceGap) <= 1e-9 && cand.ratioDiff < best.ratioDiff) ||
+            (Math.abs(cand.scale - best.scale) <= 1e-9 && Math.abs(cand.maxPrice - best.maxPrice) <= 1e-9 && Math.abs(cand.priceGap - best.priceGap) <= 1e-9 && cand.ratioDiff === best.ratioDiff && cand.count < best.count)
+          ) {
+            best = cand;
+          }
+        }
+      }
+    }
+  }
+
+  if (!best) return null;
+
+  const idxA = [];
+  const idxB = [];
+  for (let i = 0; i < N; i++) {
+    (best.mask & (1 << i)) ? idxA.push(i) : idxB.push(i);
+  }
+
+  return {
+    idxA,
+    idxB,
+    feasible: best.feasible,
+    scale: best.scale,
+    maxPrice: best.maxPrice,
+    priceGap: best.priceGap,
+    priceAFull: best.priceAFull,
+    priceBFull2: best.priceBFull2,
+    overA: best.overA,
+    overB: best.overB
+  };
+}
+
+function renderNameMappingPanel(missingNames) {
+  const panel = document.getElementById('name-map');
+  const list = document.getElementById('name-map-list');
+  const unique = [...new Set(missingNames)];
+
+  if (!unique.length) {
+    panel.style.display = 'none';
+    list.innerHTML = '';
+    return;
+  }
+
+  list.innerHTML = unique.map(name => {
+    const key = normalizeDrugName(name);
+    const selected = store.nameOverrides[key] || '';
+    const options = [
+      '<option value="">請選擇標準藥名</option>',
+      '<option value="__ignore__"' + (selected === '__ignore__' ? ' selected' : '') + '>不計價（忽略）</option>',
+      ...suggestPriceCandidates(name).map(candidate => {
+        const cKey = normalizeDrugName(candidate);
+        const price = PRICE_TABLE[candidate];
+        const isSelected = selected === cKey ? ' selected' : '';
+        return `<option value="${escapeHtml(cKey)}"${isSelected}>${escapeHtml(candidate)}（${formatMoney(price)}）</option>`;
+      })
+    ].join('');
+    return `
+      <div class="name-map-item">
+        <div class="orig">${escapeHtml(name)}</div>
+        <select data-name-key="${escapeHtml(key)}">
+          ${options}
+        </select>
+      </div>
+    `;
+  }).join('');
+
+  panel.style.display = 'block';
+}
+
+function bindNameMappingEvents() {
+  const list = document.getElementById('name-map-list');
+  list.onchange = e => {
+    const target = e.target;
+    if (!target.matches('select[data-name-key]')) return;
+    const key = target.getAttribute('data-name-key');
+    const value = target.value;
+    if (!value) {
+      delete store.nameOverrides[key];
+    } else {
+      store.nameOverrides[key] = value;
+    }
+    calculate();
+  };
+}
+
+/* ── 即時計數 ── */
+function onInputChange() {
+  const raw = document.getElementById('input-main').value;
+  const bar = document.getElementById('count-main');
+  const parsed = parsePrescription(raw);
+
+  if (!raw.trim()) {
+    bar.textContent = '';
+    bar.classList.remove('over');
+    return;
+  }
+
+  if (!parsed || parsed.invalid) {
+    bar.textContent = '格式含無效內容';
+    bar.classList.remove('over');
+    return;
+  }
+
+  const n = parsed.items.length;
+  const total = parseFloat(document.getElementById('total-main').value);
+  const singleMode = total <= 20 || n <= 12;
+  const btn = document.querySelector('button.btn[onclick="calculate()"]');
+
+  if (singleMode) {
+    bar.classList.remove('over');
+    bar.textContent = `${n} 味 → 單張藥單（不分組）`;
+    if (btn) btn.textContent = '換算（單張藥單）';
+    return;
+  }
+
+  if (btn) btn.textContent = '換算並自動分組';
+  const over = n > 24;
+  bar.classList.toggle('over', over);
+
+  if (over) {
+    bar.textContent = `⚠ ${n} 味（超過上限 24 味，A＋B 每組最多各 12 味）`;
+  } else {
+    const { idxA, idxB } = optimalSplit(parsed.items, parsed.ratios);
+    bar.textContent = idxB.length > 0
+      ? `${n} 味 → 最佳分組：A 組 ${idxA.length} 味 ／ B 組 ${idxB.length} 味`
+      : `${n} 味 → 全部放入 A 組`;
+  }
+}
+
+function updatePriceSection() {
+  const priceACard = document.getElementById('price-a-card');
+  const priceBCard = document.getElementById('price-b-card');
+  const priceALabel = document.getElementById('price-a-label');
+  const priceAVal = document.getElementById('price-a-val');
+  const priceBVal = document.getElementById('price-b-val');
+  const priceDiff = document.getElementById('price-diff');
+
+  /* ── 單張藥單模式 ── */
+  if (store.singleMode) {
+    priceBCard.style.display = 'none';
+    priceALabel.textContent = '藥單總價格';
+    const knownA = sumPrice(store.aItems, store.a);
+    if (knownA.missing.length) {
+      priceAVal.textContent = '-';
+      priceDiff.textContent = `缺少單價：${knownA.missing.join('、')}`;
+      priceACard.classList.remove('over');
+      renderNameMappingPanel(knownA.missing);
+      return;
+    }
+    priceAVal.textContent = `${formatMoney(knownA.total)} 元`;
+    priceACard.classList.remove('over');
+    priceDiff.textContent = '';
+    renderNameMappingPanel([]);
+    return;
+  }
+
+  /* ── 分組模式（恢復 B 卡與標籤） ── */
+  priceBCard.style.display = '';
+  priceALabel.textContent = 'A 組總價格';
+
+  const knownA = sumPrice(store.aItems, store.a);
+  const knownB = sumPrice(store.bItems, store.b);
+  const missing = [...new Set([...knownA.missing, ...knownB.missing])];
+
+  if (missing.length || store.priceAFull == null || store.priceBFull2 == null) {
+    priceAVal.textContent = 'A 組 -';
+    priceBVal.textContent = 'B 組×2 -';
+    priceDiff.textContent = `缺少單價：${missing.join('、')}`;
+    priceACard.classList.remove('over');
+    priceBCard.classList.remove('over');
+    renderNameMappingPanel(missing);
+    return;
+  }
+
+  const scale = store.scale ?? 1;
+  const priceA = store.priceAFull * scale;
+  const priceB2 = store.priceBFull2 * scale;
+  const aDiff = priceA - 40;
+  const bDiff = priceB2 - 40;
+  const aOver = aDiff > 0;
+  const bOver = bDiff > 0;
+
+  priceAVal.textContent = `A 組 ${formatMoney(priceA)} 元${aOver ? `（超出 ${formatMoney(aDiff)}）` : `（剩餘 ${formatMoney(Math.abs(aDiff))}）`}`;
+  priceBVal.textContent = `B 組×2 ${formatMoney(priceB2)} 元${bOver ? `（超出 ${formatMoney(bDiff)}）` : `（剩餘 ${formatMoney(Math.abs(bDiff))}）`}`;
+  priceACard.classList.toggle('over', aOver);
+  priceBCard.classList.toggle('over', bOver);
+
+  if (!aOver && !bOver) {
+    priceDiff.textContent = scale >= 0.999999
+      ? '兩組皆在 40 元內'
+      : `已縮放至 ${formatMoney(scale * 100)}% 才符合 40 元上限`;
+  } else {
+    const diffs = [];
+    if (aOver) diffs.push(`A 超出 ${formatMoney(aDiff)} 元`);
+    if (bOver) diffs.push(`B×2 超出 ${formatMoney(bDiff)} 元`);
+    priceDiff.textContent = diffs.join('、');
+  }
+
+  renderNameMappingPanel([]);
+}
+
+function clearNameMappings() {
+  store.nameOverrides = {};
+  updatePriceSection();
+}
+
+/* ── 渲染 chips ── */
+function renderChips(id, items, grams, cls) {
+  const html = items.map((item, i) => {
+    const gramText = formatOneDecimal(grams[i]);
+    return (
+      '<div class="chip ' + cls + '">' +
+        '<span class="chip-name">' + escapeHtml(item.name) + '</span>' +
+        '<span class="chip-ratio">' + escapeHtml(item.ratioText) + '</span>' +
+        gramText + '<u>g</u>' +
+      '</div>'
+    );
+  }).join('');
+  document.getElementById(id).innerHTML = html;
+}
+
+/* ── 最佳分組：
+   ① 比例均衡（A ≈ ⅔）是紅線：只接受不超過最優比例偏差 + 5% 容差的分法
+   ② 在合法範圍內，高低價打散讓兩組 scale 最大（都盡量落在 40 元內）
+   ③ 找不到藥價時退回純比例分組 ── */
+function optimalSplit(items, ratios) {
+  // 先算出純比例最優解，取得最小比例偏差作為下界
+  const ratioSplit = optimalSplitByRatio(ratios);
+  const totalSum = ratios.reduce((s, r) => s + r, 0);
+  const targetA = totalSum * 2 / 3;
+  const ratioSumA = ratioSplit.idxA.reduce((s, i) => s + ratios[i], 0);
+  const minRatioDiff = Math.abs(ratioSumA - targetA);
+  // 容差：最多允許超出最優偏差 5%（最小保留 1 個比例單位的彈性）
+  const tolerance = Math.max(1, totalSum * 0.05);
+  const maxRatioDiff = minRatioDiff + tolerance;
+
+  // 在比例紅線內尋找藥費最優分法
+  const byPrice = chooseBestSplitByPrice(items, ratios, maxRatioDiff);
+  if (byPrice) return byPrice;
+
+  // 無藥價資料時，退回比例分法並補算縮放係數
+  const prices = collectUnitPrices(items);
+  if (prices.some(p => p == null)) return ratioSplit;
+  const { idxA, idxB } = ratioSplit;
+  const rSumA = idxA.reduce((s, i) => s + ratios[i], 0);
+  const rSumB = idxB.reduce((s, i) => s + ratios[i], 0);
+  const wPA = idxA.reduce((s, i) => s + ratios[i] * prices[i], 0);
+  const wPB = idxB.reduce((s, i) => s + ratios[i] * prices[i], 0);
+  const priceAFull  = rSumA > 0 ? wPA / rSumA * 20 : 0;
+  const priceBFull2 = rSumB > 0 ? wPB / rSumB * 20 : 0;
+  const scale = Math.min(1,
+    priceAFull  > 0 ? 40 / priceAFull  : 1,
+    priceBFull2 > 0 ? 40 / priceBFull2 : 1
+  );
+  return { idxA, idxB, scale, priceAFull, priceBFull2 };
+}
+
+function optimalSplitByRatio(ratios) {
+  const N = ratios.length;
+  if (N === 0) return { idxA: [], idxB: [] };
+  if (N === 1) return { idxA: [0], idxB: [] };
+
+  const totalSum = ratios.reduce((s, r) => s + r, 0);
+  const iTarget = Math.round(totalSum * 2 / 3 * 10);
+  const minA = Math.max(1, N - 12);
+  const maxA = Math.min(N - 1, 12);
+
+  const iRatios = ratios.map(r => Math.round(r * 10));
+  const iTotal = iRatios.reduce((s, r) => s + r, 0);
+
+  if (iTotal > 30000) {
+    const nA = Math.min(Math.ceil(N / 2), 12);
+    return {
+      idxA: Array.from({ length: nA }, (_, i) => i),
+      idxB: Array.from({ length: N - nA }, (_, i) => i + nA)
+    };
+  }
+
+  const MS = iTotal + 1;
+  const layers = [];
+  const init = new Uint8Array((maxA + 1) * MS);
+  init[0] = 1;
+  layers.push(init);
+
+  for (let i = 0; i < N; i++) {
+    const r = iRatios[i];
+    const prev = layers[i];
+    const curr = new Uint8Array(prev);
+    for (let j = 0; j < maxA; j++) {
+      const base = j * MS;
+      for (let s = 0; s + r < MS; s++) {
+        if (prev[base + s]) curr[(j + 1) * MS + s + r] = 1;
+      }
+    }
+    layers.push(curr);
+  }
+
+  const final = layers[N];
+  let bestJ = -1;
+  let bestS = -1;
+  let bestDiff = Infinity;
+  for (let j = minA; j <= maxA; j++) {
+    const base = j * MS;
+    for (let s = 0; s < MS; s++) {
+      if (final[base + s]) {
+        const diff = Math.abs(s - iTarget);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestJ = j;
+          bestS = s;
+        }
+      }
+    }
+  }
+
+  if (bestJ === -1) {
+    const nA = Math.min(Math.ceil(N / 2), 12);
+    return {
+      idxA: Array.from({ length: nA }, (_, i) => i),
+      idxB: Array.from({ length: N - nA }, (_, i) => i + nA)
+    };
+  }
+
+  const selected = new Set();
+  let j = bestJ;
+  let s = bestS;
+  for (let i = N - 1; i >= 0; i--) {
+    if (j > 0 && s >= iRatios[i] && layers[i][(j - 1) * MS + s - iRatios[i]]) {
+      selected.add(i);
+      j--;
+      s -= iRatios[i];
+    }
+  }
+
+  const idxA = [];
+  const idxB = [];
+  for (let i = 0; i < N; i++) (selected.has(i) ? idxA : idxB).push(i);
+  return { idxA, idxB };
+}
+
+/* ══════════ 主計算 ══════════ */
+function calculate() {
+  const raw = document.getElementById('input-main').value;
+  const total = parseFloat(document.getElementById('total-main').value);
+  const errEl = document.getElementById('err-main');
+  const resEl = document.getElementById('results');
+
+  errEl.style.display = 'none';
+  resEl.style.display = 'none';
+  document.getElementById('input-main').classList.remove('err');
+
+  if (!raw.trim()) {
+    showErr('請輸入藥物比例');
+    return;
+  }
+  if (!total || total <= 0) {
+    showErr('請輸入有效的總量');
+    return;
+  }
+
+  const parsed = parsePrescription(raw);
+  if (!parsed || parsed.invalid) {
+    document.getElementById('input-main').classList.add('err');
+    showErr('格式有誤，請輸入「藥名 比例」或純數字');
+    return;
+  }
+
+  const ratios = parsed.ratios;
+  const items = parsed.items;
+  const N = ratios.length;
+  const singleMode = total <= 20 || N <= 12;
+
+  if (!singleMode && N > 24) {
+    document.getElementById('input-main').classList.add('err');
+    showErr(`共 ${N} 味，超過上限（A＋B 每組各最多 12 味，合計最多 24 味）`);
+    return;
+  }
+
+  /* ══════════ 單張藥單模式（總量 ≤ 20g 或藥味 ≤ 12 味） ══════════ */
+  if (singleMode) {
+    store.items = items;
+    store.scale = 1;
+    store.priceAFull = null;
+    store.priceBFull2 = null;
+    store.singleMode = true;
+    store.ref = toGrams(ratios, total);
+    store.a = store.ref.slice();
+    store.b = [];
+    store.b2 = [];
+    store.aItems = items;
+    store.bItems = [];
+
+    /* 全方參考區 */
+    document.getElementById('ref-badge').textContent = `全方 ${formatOneDecimal(total)}g`;
+    document.getElementById('ref-meta').textContent = `${N} 味`;
+    document.getElementById('ref-a-label').textContent = '';
+    renderChips('ref-nums-a', items, store.ref, 'chip-a');
+    document.getElementById('ref-b-section').style.display = 'none';
+    document.getElementById('sum-ref').innerHTML = `合計 <b>${formatOneDecimal(store.ref.reduce((s, v) => s + v, 0))} g</b>`;
+    document.getElementById('split-note').textContent = `${N} 味，總量 ≤ 20g，單張藥單不分組`;
+
+    /* 藥單（只有 A） */
+    const aBadge = document.querySelector('#block-a .badge-a');
+    if (aBadge) aBadge.textContent = '藥單';
+    renderChips('nums-a', items, store.a, 'chip-a');
+    document.getElementById('a-meta').textContent = `${N} 味 → ${formatOneDecimal(total)}g`;
+    document.getElementById('sum-a').innerHTML =
+      `合計 <b>${formatOneDecimal(store.a.reduce((s, v) => s + v, 0))} g</b>`;
+
+    /* 隱藏 B 組與合計列 */
+    document.getElementById('block-b').style.display = 'none';
+    document.getElementById('grand-row').style.display = 'none';
+
+    store.overrideA = null;
+    store.overrideB = null;
+    const adjPanel = document.getElementById('adjust-panel');
+    if (adjPanel) adjPanel.classList.remove('open');
+    const adjBtn = document.getElementById('adj-toggle-btn');
+    if (adjBtn) adjBtn.textContent = '⚖ 微調劑量';
+    updatePriceSection();
+
+    resEl.style.display = 'block';
+    return;
+  }
+
+  /* ══════════ 分組模式（總量 > 20g） ══════════ */
+  store.singleMode = false;
+  /* 確保 badge 恢復為「藥單 A」（切換回來時） */
+  const aBadgeBack = document.querySelector('#block-a .badge-a');
+  if (aBadgeBack) aBadgeBack.textContent = '藥單 A';
+
+  const split = optimalSplit(items, ratios);
+  const { idxA, idxB } = split;
+  const nA = idxA.length;
+  const ratiosA = idxA.map(i => ratios[i]);
+  const ratiosB = idxB.map(i => ratios[i]);
+  const itemsA = idxA.map(i => items[i]);
+  const itemsB = idxB.map(i => items[i]);
+  const hasB = ratiosB.length > 0;
+  const scale = split.scale ?? 1;
+  const targetA = 20 * scale;
+  const targetB = 10 * scale;
+  const priceAware = split.priceAFull != null && split.priceBFull2 != null;
+
+  store.items = items;
+  store.scale = scale;
+  store.priceAFull = split.priceAFull ?? null;
+  store.priceBFull2 = split.priceBFull2 ?? null;
+  store.ref = toGrams(ratios, total * scale);
+  store.a = toGrams(ratiosA, targetA);
+  store.b = hasB ? toGrams(ratiosB, targetB) : [];
+  store.b2 = store.b.map(v => v * 2);
+  store.aItems = itemsA;
+  store.bItems = itemsB;
+
+  const refA = idxA.map(i => store.ref[i]);
+  const refB = idxB.map(i => store.ref[i]);
+
+  /* ── 渲染：全方 ── */
+  const adjustedTotal = total * scale;
+  document.getElementById('ref-badge').textContent = `全方 ${formatOneDecimal(adjustedTotal)}g`;
+  document.getElementById('ref-meta').textContent = `${N} 味`;
+
+  renderChips('ref-nums-a', itemsA, refA, 'chip-a');
+  document.getElementById('ref-a-label').textContent = `A 組（${nA} 味）`;
+
+  const refBSection = document.getElementById('ref-b-section');
+  if (hasB) {
+    renderChips('ref-nums-b', itemsB, refB, 'chip-b');
+    document.getElementById('ref-b-label').textContent = `B 組（${ratiosB.length} 味）`;
+    refBSection.style.display = 'block';
+  } else {
+    refBSection.style.display = 'none';
+  }
+
+  document.getElementById('sum-ref').innerHTML = `合計 <b>${formatOneDecimal(targetA + targetB)} g</b>`;
+  document.getElementById('split-note').textContent =
+    hasB
+      ? (priceAware && split.feasible
+          ? `最佳分組：A 組 ${nA} 味 → ${formatOneDecimal(targetA)}g　B 組 ${ratiosB.length} 味 → ${formatOneDecimal(targetB)}g，且兩組都在 40 元內`
+          : priceAware
+            ? `已自動縮放至 ${formatMoney(scale * 100)}%，讓 A 組 ${formatOneDecimal(targetA)}g / B 組 ${formatOneDecimal(targetB)}g 盡量不超標`
+            : `A 組 ${nA} 味 → ${formatOneDecimal(targetA)}g　B 組 ${ratiosB.length} 味 → ${formatOneDecimal(targetB)}g`)
+      : `${N} 味全數放入 A 組`;
+
+  /* ── 渲染：藥單 A ── */
+  renderChips('nums-a', itemsA, store.a, 'chip-a');
+  document.getElementById('a-meta').textContent = `${nA} 味 → ${formatOneDecimal(targetA)}g`;
+  document.getElementById('sum-a').innerHTML =
+    `合計 <b>${formatOneDecimal(store.a.reduce((s, v) => s + v, 0))} g</b>`;
+
+  /* ── 渲染：藥單 B ── */
+  const blockB = document.getElementById('block-b');
+  const abHr = document.getElementById('ab-hr');
+  if (hasB) {
+    renderChips('nums-b', itemsB, store.b, 'chip-b');
+    renderChips('nums-b2', itemsB, store.b2, 'chip-x2');
+    document.getElementById('b-meta').textContent = `${ratiosB.length} 味 → ${formatOneDecimal(targetB)}g`;
+    document.getElementById('sum-b').innerHTML =
+      `合計 <b>${formatOneDecimal(store.b.reduce((s, v) => s + v, 0))} g</b>`;
+    document.getElementById('sum-b2').innerHTML =
+      `合計 <b>${formatOneDecimal(store.b2.reduce((s, v) => s + v, 0))} g</b>`;
+    blockB.style.display = 'block';
+    abHr.style.display = '';
+  } else {
+    blockB.style.display = 'none';
+    abHr.style.display = 'none';
+  }
+
+  /* ── 合計 ── */
+  const grandRow = document.getElementById('grand-row');
+  if (hasB) {
+    document.getElementById('grand-val').textContent = `= ${formatOneDecimal(targetA + targetB)} g`;
+    grandRow.style.display = 'flex';
+  } else {
+    grandRow.style.display = 'none';
+  }
+
+  /* ── 價格 ── */
+  store.overrideA = null;
+  store.overrideB = null;
+  const adjPanel = document.getElementById('adjust-panel');
+  if (adjPanel) adjPanel.classList.remove('open');
+  const adjBtn = document.getElementById('adj-toggle-btn');
+  if (adjBtn) adjBtn.textContent = '⚖ 微調劑量';
+  updatePriceSection();
+
+  resEl.style.display = 'block';
+}
+
+/* ══════════ 複製 ══════════ */
+function copyData(which) {
+  const b2 = store.b2.length ? store.b2 : store.b.map(v => v * 2);
+  const map = {
+    ref: { items: store.items, grams: store.ref },
+    a: { items: store.aItems, grams: store.a },
+    b: { items: store.bItems, grams: store.b },
+    b2: { items: store.bItems, grams: b2 }
+  };
+  const payload = map[which] || { items: [], grams: [] };
+  const text = payload.items
+    .map((item, index) => `${item.name} ${formatOneDecimal(payload.grams[index])}g`)
+    .join('、');
+  const selectors = { ref: '.copy-ref', a: '.copy-a', b: '.copy-b', b2: '.copy-x2' };
+  const btn = document.querySelector(selectors[which]);
+  clipboard(text, btn);
+}
+
+function clipboard(text, btn) {
+  const flash = b => {
+    const orig = b.textContent;
+    b.textContent = '已複製！';
+    setTimeout(() => b.textContent = orig, 1500);
+  };
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(() => flash(btn)).catch(() => fallback(text, btn, flash));
+  } else {
+    fallback(text, btn, flash);
+  }
+}
+
+function fallback(text, btn, cb) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    document.execCommand('copy');
+    cb(btn);
+  } catch {
+    btn.textContent = '請手動複製';
+    setTimeout(() => btn.textContent = '複製', 2500);
+  }
+  document.body.removeChild(ta);
+}
+
+function showErr(msg) {
+  const el = document.getElementById('err-main');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+/* ══════════ 劑量微調 ══════════ */
+
+function calcAdjPrice(items, grams) {
+  let total = 0;
+  for (let i = 0; i < items.length; i++) {
+    const up = lookupUnitPrice(items[i].name);
+    if (up == null) return null;
+    total += grams[i] * up;
+  }
+  return total;
+}
+
+function toggleAdjust() {
+  const panel = document.getElementById('adjust-panel');
+  const isOpen = panel.classList.toggle('open');
+  document.getElementById('adj-toggle-btn').textContent = isOpen ? '⚖ 收起微調' : '⚖ 微調劑量';
+  if (isOpen) renderAdjustPanel();
+}
+
+function renderAdjustPanel() {
+  const body = document.getElementById('adj-body');
+  if (!body) return;
+  const gramsA = store.overrideA ?? [...store.a];
+  const gramsB = store.overrideB ?? [...store.b];
+  let html = '';
+
+  if (store.aItems.length) {
+    html += '<div class="adj-group"><div class="adj-group-title">A 組（目標 20g）</div><div class="adj-grid">';
+    store.aItems.forEach((item, i) => {
+      html += `<span class="adj-drug-name">${escapeHtml(item.name)}<span class="adj-ratio">${escapeHtml(item.ratioText)}</span></span>` +
+        `<input class="adj-input" type="number" value="${gramsA[i]}" min="0" step="0.1" data-group="a" data-idx="${i}" oninput="onAdjustInput(this)">` +
+        `<span class="adj-unit">g</span>`;
+    });
+    const totalA = gramsA.reduce((s, v) => s + v, 0);
+    const priceA = calcAdjPrice(store.aItems, gramsA);
+    html += `</div><div class="adj-sum-row" id="adj-sum-a">` +
+      `<span>合計 <b>${formatOneDecimal(totalA)} g</b></span>` +
+      `<span>藥費 <b>${priceA != null ? formatMoney(priceA) + ' 元' : '—'}</b></span>` +
+      `</div></div>`;
+  }
+
+  if (store.bItems.length) {
+    html += '<div class="adj-group"><div class="adj-group-title">B 組（10g，×2 計費）</div><div class="adj-grid">';
+    store.bItems.forEach((item, i) => {
+      html += `<span class="adj-drug-name">${escapeHtml(item.name)}<span class="adj-ratio">${escapeHtml(item.ratioText)}</span></span>` +
+        `<input class="adj-input" type="number" value="${gramsB[i]}" min="0" step="0.1" data-group="b" data-idx="${i}" oninput="onAdjustInput(this)">` +
+        `<span class="adj-unit">g</span>`;
+    });
+    const totalB = gramsB.reduce((s, v) => s + v, 0);
+    const priceB = calcAdjPrice(store.bItems, gramsB);
+    const priceB2 = priceB != null ? priceB * 2 : null;
+    html += `</div><div class="adj-sum-row" id="adj-sum-b">` +
+      `<span>合計 <b>${formatOneDecimal(totalB)} g</b>（×2 = <b>${formatOneDecimal(totalB * 2)} g</b>）</span>` +
+      `<span>×2 藥費 <b>${priceB2 != null ? formatMoney(priceB2) + ' 元' : '—'}</b></span>` +
+      `</div></div>`;
+  }
+
+  body.innerHTML = html;
+  renderAdjPriceBar();
+}
+
+function onAdjustInput(input) {
+  const v = parseFloat(input.value);
+  if (!Number.isFinite(v) || v < 0) return;
+  const group = input.dataset.group;
+  const idx = parseInt(input.dataset.idx);
+  if (group === 'a') {
+    if (!store.overrideA) store.overrideA = [...store.a];
+    store.overrideA[idx] = v;
+  } else {
+    if (!store.overrideB) store.overrideB = [...store.b];
+    store.overrideB[idx] = v;
+  }
+  // Update sum row without re-rendering inputs
+  const gramsA = store.overrideA ?? store.a;
+  const gramsB = store.overrideB ?? store.b;
+  const sumA = document.getElementById('adj-sum-a');
+  if (sumA && store.aItems.length) {
+    const totalA = gramsA.reduce((s, v) => s + v, 0);
+    const priceA = calcAdjPrice(store.aItems, gramsA);
+    sumA.innerHTML = `<span>合計 <b>${formatOneDecimal(totalA)} g</b></span>` +
+      `<span>藥費 <b>${priceA != null ? formatMoney(priceA) + ' 元' : '—'}</b></span>`;
+  }
+  const sumB = document.getElementById('adj-sum-b');
+  if (sumB && store.bItems.length) {
+    const totalB = gramsB.reduce((s, v) => s + v, 0);
+    const priceB = calcAdjPrice(store.bItems, gramsB);
+    const priceB2 = priceB != null ? priceB * 2 : null;
+    sumB.innerHTML = `<span>合計 <b>${formatOneDecimal(totalB)} g</b>（×2 = <b>${formatOneDecimal(totalB * 2)} g</b>）</span>` +
+      `<span>×2 藥費 <b>${priceB2 != null ? formatMoney(priceB2) + ' 元' : '—'}</b></span>`;
+  }
+  renderAdjPriceBar();
+}
+
+function renderAdjPriceBar() {
+  const bar = document.getElementById('adj-price-bar');
+  if (!bar) return;
+  const gramsA = store.overrideA ?? store.a;
+  const gramsB = store.overrideB ?? store.b;
+  const priceA = calcAdjPrice(store.aItems, gramsA);
+  const priceB = calcAdjPrice(store.bItems, gramsB);
+  const priceB2 = priceB != null ? priceB * 2 : null;
+
+  if (priceA == null || priceB2 == null) { bar.innerHTML = ''; return; }
+  const aOver = priceA > 40;
+  const bOver = priceB2 > 40;
+  const aDiff = priceA - 40;
+  const bDiff = priceB2 - 40;
+  bar.className = `adj-price-bar${aOver || bOver ? ' over' : ''}`;
+  bar.innerHTML =
+    `<span class="adj-price-label">微調後總計</span>` +
+    `<span>A 組 <b>${formatMoney(priceA)} 元</b>${aOver ? `（超 ${formatMoney(aDiff)}）` : `（剩 ${formatMoney(Math.abs(aDiff))}）`}</span>` +
+    `<span style="color:#ccc">／</span>` +
+    `<span>B×2 <b>${formatMoney(priceB2)} 元</b>${bOver ? `（超 ${formatMoney(bDiff)}）` : `（剩 ${formatMoney(Math.abs(bDiff))}）`}</span>`;
+}
+
+function resetAdjust() {
+  store.overrideA = null;
+  store.overrideB = null;
+  renderAdjustPanel();
+}
+
+/* ══════════ 藥價表管理 ══════════ */
+
+function rebuildPriceIndex() {
+  PRICE_INDEX = new Map(
+    Object.entries(PRICE_TABLE).map(([name, price]) => [normalizeDrugName(name), price])
+  );
+}
+
+function persistPriceTable() {
+  localStorage.setItem('drugPriceTable', JSON.stringify(PRICE_TABLE));
+}
+
+function showPeSavedNote() {
+  const note = document.getElementById('pe-saved-note');
+  if (!note) return;
+  note.classList.add('show');
+  clearTimeout(note._timer);
+  note._timer = setTimeout(() => note.classList.remove('show'), 2000);
+}
+
+function updatePeDrugCount() {
+  const el = document.getElementById('pe-drug-count');
+  if (el) el.textContent = `共 ${Object.keys(PRICE_TABLE).length} 種藥物`;
+}
+
+function togglePriceEditor() {
+  const panel = document.getElementById('price-editor-panel');
+  const isOpen = panel.classList.toggle('open');
+  document.getElementById('pe-toggle-btn').textContent =
+    isOpen ? '⚙ 收起藥價表' : '⚙ 管理藥價表';
+  if (isOpen) {
+    renderPriceEditorTable();
+    updatePeDrugCount();
+  }
+}
+
+function renderPriceEditorTable() {
+  const body = document.getElementById('price-table-list-body');
+  if (!body) return;
+  const entries = Object.entries(PRICE_TABLE).sort((a, b) => b[1] - a[1]);
+  body.innerHTML = entries.map(([name, price]) =>
+    `<div class="pe-row" data-orig-name="${escapeHtml(name)}">` +
+      `<input class="pe-input-name" type="text" value="${escapeHtml(name)}">` +
+      `<input class="pe-input-price" type="number" value="${price}" step="0.01" min="0">` +
+      `<button class="pe-del-btn" title="刪除此藥物">×</button>` +
+    `</div>`
+  ).join('');
+}
+
+function commitPriceRowChange(row) {
+  const origName = row.dataset.origName;
+  const nameInput = row.querySelector('.pe-input-name');
+  const priceInput = row.querySelector('.pe-input-price');
+  const newName = nameInput.value.trim();
+  const newPrice = parseFloat(priceInput.value);
+  if (!newName || !Number.isFinite(newPrice) || newPrice < 0) return;
+  if (origName !== newName) {
+    delete PRICE_TABLE[origName];
+    row.dataset.origName = newName;
+  }
+  PRICE_TABLE[newName] = newPrice;
+  persistPriceTable();
+  rebuildPriceIndex();
+  updatePeDrugCount();
+  showPeSavedNote();
+  if (document.getElementById('results').style.display !== 'none') calculate();
+}
+
+function addPriceRow() {
+  let newName = '新藥物';
+  let i = 1;
+  while (Object.prototype.hasOwnProperty.call(PRICE_TABLE, newName)) newName = `新藥物${i++}`;
+  PRICE_TABLE[newName] = 0;
+  persistPriceTable();
+  rebuildPriceIndex();
+  renderPriceEditorTable();
+  updatePeDrugCount();
+  const wrap = document.querySelector('.pe-table-wrap');
+  if (wrap) wrap.scrollTop = wrap.scrollHeight;
+  const rows = document.querySelectorAll('#price-table-list-body .pe-row');
+  for (const r of rows) {
+    if (r.dataset.origName === newName) {
+      const input = r.querySelector('.pe-input-name');
+      if (input) { input.focus(); input.select(); }
+      break;
+    }
+  }
+}
+
+function resetPriceTable() {
+  if (!window.confirm('確定要重設為預設藥價表嗎？所有修改將會遺失。')) return;
+  PRICE_TABLE = { ...DEFAULT_PRICE_TABLE };
+  persistPriceTable();
+  rebuildPriceIndex();
+  renderPriceEditorTable();
+  updatePeDrugCount();
+  showPeSavedNote();
+  if (document.getElementById('results').style.display !== 'none') calculate();
+}
+
+function bindPriceEditorEvents() {
+  const body = document.getElementById('price-table-list-body');
+  if (!body) return;
+
+  // 刪除按鈕
+  body.addEventListener('click', e => {
+    const delBtn = e.target.closest('.pe-del-btn');
+    if (!delBtn) return;
+    const row = delBtn.closest('.pe-row');
+    delete PRICE_TABLE[row.dataset.origName];
+    persistPriceTable();
+    rebuildPriceIndex();
+    row.remove();
+    updatePeDrugCount();
+    showPeSavedNote();
+    if (document.getElementById('results').style.display !== 'none') calculate();
+  });
+
+  // 單價欄位變更（change 事件）
+  body.addEventListener('change', e => {
+    if (!e.target.matches('.pe-input-price')) return;
+    commitPriceRowChange(e.target.closest('.pe-row'));
+  });
+
+  // 藥名欄位離開（blur，用 capture 捕捉）
+  body.addEventListener('blur', e => {
+    if (!e.target.matches('.pe-input-name')) return;
+    const row = e.target.closest('.pe-row');
+    const origName = row.dataset.origName;
+    const newName = e.target.value.trim();
+    if (!newName) { e.target.value = origName; return; }
+    if (origName !== newName && Object.prototype.hasOwnProperty.call(PRICE_TABLE, newName)) {
+      e.target.value = origName;
+      alert(`「${newName}」已存在於藥價表中，請使用不同名稱。`);
+      return;
+    }
+    commitPriceRowChange(row);
+  }, true);
+
+  // Enter 鍵觸發 blur
+  body.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    if (e.target.matches('.pe-input-name, .pe-input-price')) e.target.blur();
+  });
+}
+
+bindNameMappingEvents();
+bindPriceEditorEvents();
+
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'Enter') calculate();
+});
+</script>
+</body>
+</html>
