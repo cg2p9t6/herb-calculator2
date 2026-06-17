@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>藥物比例換算器</title>
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="藥物換算器">
+<meta name="theme-color" content="#8b6f47">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -718,6 +723,7 @@ const DEFAULT_PRICE_TABLE = {
   "殭蠶": 5.28,
   "(浙)貝母": 5.27,
   "五味子": 4.68,
+  "豬苓湯": 4.64,
   "延胡索": 4.59,
   "肉蓯蓉": 4.4,
   "連翹": 4.4,
@@ -750,11 +756,13 @@ const DEFAULT_PRICE_TABLE = {
   "石菖蒲": 2.54,
   "遠志": 2.54,
   "(北)沙參": 2.45,
+  "四君子湯": 2.39,
   "白芍": 2.34,
   "枳實": 2.34,
   "桃仁": 2.34,
   "黃柏": 2.34,
   "鬱金": 2.34,
+  "二陳湯": 2.27,
   "車前子": 2.25,
   "益智仁": 2.25,
   "淫羊藿": 2.25,
@@ -763,6 +771,7 @@ const DEFAULT_PRICE_TABLE = {
   "夏枯草": 2.15,
   "骨碎補": 2.15,
   "雞內金": 2.15,
+  "保和丸": 2.06,
   "紫菀": 1.98,
   "天花粉": 1.95,
   "何首烏": 1.95,
@@ -1595,9 +1604,15 @@ function updatePriceSection() {
       renderNameMappingPanel(knownA.missing);
       return;
     }
-    priceAVal.textContent = `${formatMoney(knownA.total)} 元`;
-    priceACard.classList.remove('over');
-    priceDiff.textContent = '';
+    const price = knownA.total;
+    const over = price > 40.005;
+    const diff = price - 40;
+    priceAVal.textContent = `${formatMoney(price)} 元${over ? `（超出 ${formatMoney(diff)}）` : `（剩餘 ${formatMoney(Math.abs(diff))}）`}`;
+    priceACard.classList.toggle('over', over);
+    const scale = store.scale ?? 1;
+    priceDiff.textContent = (!over && scale < 0.999999)
+      ? `已縮放至 ${formatOneDecimal(scale * 100)}%，使藥費 ≤ 40 元`
+      : '';
     renderNameMappingPanel([]);
     return;
   }
@@ -1827,16 +1842,29 @@ function calculate() {
   /* ══════════ 單張藥單模式（總量 ≤ 20g 或藥味 ≤ 12 味） ══════════ */
   if (singleMode) {
     store.items = items;
-    store.scale = 1;
-    store.priceAFull = null;
     store.priceBFull2 = null;
     store.singleMode = true;
-    store.ref = toGrams(ratios, total);
-    store.a = store.ref.slice();
     store.b = [];
     store.b2 = [];
     store.aItems = items;
     store.bItems = [];
+
+    /* ── 縮放計算：若有完整單價且總藥費 > 40 元，等比例縮小 ── */
+    const singlePrices = collectUnitPrices(items);
+    const allPricesAvailable = singlePrices.every(p => p != null);
+    const rawGrams = toGrams(ratios, total);
+    let singleScale = 1;
+    if (allPricesAvailable) {
+      const rawPrice = rawGrams.reduce((sum, g, i) => sum + g * singlePrices[i], 0);
+      if (rawPrice > 40) singleScale = 40 / rawPrice;
+    }
+    const scaledTotal = total * singleScale;
+    const scaledGrams = singleScale < 0.999999 ? toGrams(ratios, scaledTotal) : rawGrams;
+
+    store.scale = singleScale;
+    store.priceAFull = null;
+    store.ref = rawGrams;
+    store.a = scaledGrams.slice();
 
     /* 全方參考區 */
     document.getElementById('ref-badge').textContent = `全方 ${formatOneDecimal(total)}g`;
@@ -1845,13 +1873,19 @@ function calculate() {
     renderChips('ref-nums-a', items, store.ref, 'chip-a');
     document.getElementById('ref-b-section').style.display = 'none';
     document.getElementById('sum-ref').innerHTML = `合計 <b>${formatOneDecimal(store.ref.reduce((s, v) => s + v, 0))} g</b>`;
-    document.getElementById('split-note').textContent = `${N} 味，總量 ≤ 20g，單張藥單不分組`;
+    const conditions = [];
+    if (N <= 12) conditions.push(`${N} 味 ≤ 12`);
+    if (total <= 20) conditions.push(`總量 ≤ 20g`);
+    const scaleNote = singleScale < 0.999999
+      ? `；已縮放至 ${formatOneDecimal(singleScale * 100)}%（${formatOneDecimal(total)}g → ${formatOneDecimal(scaledTotal)}g），藥費 ≤ 40 元`
+      : '';
+    document.getElementById('split-note').textContent = `${conditions.join('、')}，單張藥單不分組${scaleNote}`;
 
     /* 藥單（只有 A） */
     const aBadge = document.querySelector('#block-a .badge-a');
     if (aBadge) aBadge.textContent = '藥單';
     renderChips('nums-a', items, store.a, 'chip-a');
-    document.getElementById('a-meta').textContent = `${N} 味 → ${formatOneDecimal(total)}g`;
+    document.getElementById('a-meta').textContent = `${N} 味 → ${formatOneDecimal(scaledTotal)}g`;
     document.getElementById('sum-a').innerHTML =
       `合計 <b>${formatOneDecimal(store.a.reduce((s, v) => s + v, 0))} g</b>`;
 
@@ -1894,7 +1928,7 @@ function calculate() {
   store.scale = scale;
   store.priceAFull = split.priceAFull ?? null;
   store.priceBFull2 = split.priceBFull2 ?? null;
-  store.ref = toGrams(ratios, total * scale);
+  store.ref = toGrams(ratios, total);
   store.a = toGrams(ratiosA, targetA);
   store.b = hasB ? toGrams(ratiosB, targetB) : [];
   store.b2 = store.b.map(v => v * 2);
@@ -1906,7 +1940,7 @@ function calculate() {
 
   /* ── 渲染：全方 ── */
   const adjustedTotal = total * scale;
-  document.getElementById('ref-badge').textContent = `全方 ${formatOneDecimal(adjustedTotal)}g`;
+  document.getElementById('ref-badge').textContent = `全方 ${formatOneDecimal(total)}g`;
   document.getElementById('ref-meta').textContent = `${N} 味`;
 
   renderChips('ref-nums-a', itemsA, refA, 'chip-a');
@@ -1921,7 +1955,7 @@ function calculate() {
     refBSection.style.display = 'none';
   }
 
-  document.getElementById('sum-ref').innerHTML = `合計 <b>${formatOneDecimal(targetA + targetB)} g</b>`;
+  document.getElementById('sum-ref').innerHTML = `合計 <b>${formatOneDecimal(total)} g</b>`;
   document.getElementById('split-note').textContent =
     hasB
       ? (priceAware && split.feasible
@@ -2304,6 +2338,12 @@ bindPriceEditorEvents();
 document.addEventListener('keydown', e => {
   if (e.ctrlKey && e.key === 'Enter') calculate();
 });
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
